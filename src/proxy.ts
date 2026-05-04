@@ -1,9 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Runs before every matched request — like Flask's @app.before_request.
-// 1. Refreshes the Supabase session cookie so it never silently expires.
-// 2. Guards protected routes — redirects unauthenticated users to /login.
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -28,22 +25,22 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: always call getUser() — do not remove, it refreshes the session
+  // IMPORTANT: always call getUser() to refresh the session — do not remove
   const { data: { user } } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthPage = path.startsWith("/login") || path.startsWith("/auth");
   const isProtected = path.startsWith("/dashboard");
+  const isAuthOrLanding = path === "/" || path.startsWith("/login") || path.startsWith("/auth");
 
-  // Unauthenticated user hitting a protected route → send to login
+  // Unauthenticated user hitting a protected route → landing page
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
-  // Authenticated user hitting the login page → send to dashboard
-  if (user && path === "/login") {
+  // Authenticated user hitting the landing page or login → dashboard
+  if (user && (path === "/" || path === "/login")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

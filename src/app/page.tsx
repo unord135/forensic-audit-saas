@@ -1,65 +1,98 @@
-import Image from "next/image";
+import Link from "next/link";
+import { GitHubSignInButton } from "@/components/GitHubSignInButton";
+import { ShieldCheck, ScanLine, History, Lock, GitBranch } from "lucide-react";
 
-export default function Home() {
+const FEATURES = [
+  {
+    icon: ScanLine,
+    title: "Secret Detection",
+    body: "Scans every source file for leaked AWS keys, Stripe secrets, database URLs, and 6 more patterns.",
+  },
+  {
+    icon: Lock,
+    title: "Dependency Audit",
+    body: "Runs npm audit on every scan and maps CVEs by severity — critical, high, moderate, low.",
+  },
+  {
+    icon: History,
+    title: "Scan History",
+    body: "Every audit is persisted to your account. Track your security score over time.",
+  },
+];
+
+export default function LandingPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-background flex flex-col">
+
+      {/* Nav */}
+      <header className="border-b px-6 py-4 flex items-center justify-between max-w-6xl mx-auto w-full">
+        <div className="flex items-center gap-2 font-bold text-lg tracking-tight">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          Forensic Audit
+        </div>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Sign in with email
+          </Link>
+          <GitHubSignInButton className="h-9 text-sm" />
+        </div>
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 py-24 max-w-3xl mx-auto w-full gap-8">
+        <div className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Powered by Supabase + Next.js
+        </div>
+
+        <div className="space-y-4">
+          <h1 className="text-5xl font-extrabold tracking-tight leading-tight">
+            Security auditing for<br />
+            <span className="text-primary">developer-founders</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+            Scan your codebase for leaked secrets and vulnerable dependencies.
+            One click, instant score, full history — all tied to your GitHub account.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <GitHubSignInButton className="h-11 px-8 text-sm font-medium" />
+          <Link
+            href="/login"
+            className="inline-flex h-11 items-center justify-center rounded-md border px-8 text-sm font-medium hover:bg-muted transition-colors"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            Sign in with email
+          </Link>
         </div>
+
+        <p className="text-xs text-muted-foreground">
+          Free during development &middot; No credit card required
+        </p>
       </main>
+
+      {/* Features */}
+      <section className="border-t py-20 px-6">
+        <div className="max-w-4xl mx-auto grid gap-8 sm:grid-cols-3">
+          {FEATURES.map(({ icon: Icon, title, body }) => (
+            <div key={title} className="flex flex-col gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Icon className="h-5 w-5 text-primary" />
+              </div>
+              <h3 className="font-semibold">{title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t py-6 px-6 text-center text-xs text-muted-foreground">
+        Forensic Audit &middot; Built with Next.js, Supabase, shadcn/ui
+      </footer>
     </div>
   );
 }

@@ -49,14 +49,33 @@ function langColor(lang: string | null): string {
 // async function = an async def — awaited automatically by Next.js
 export default async function DashboardPage() {
   const supabase = await createClient();
+
+  // getUser() verifies the JWT server-side (secure auth check)
   const { data: { user } } = await supabase.auth.getUser();
-  const username = process.env.GITHUB_USERNAME ?? "vercel";
+
+  // getSession() gives us the provider_token (GitHub OAuth token) for API calls.
+  // provider_token is separate from the Supabase JWT — it's the raw GitHub access token.
+  const { data: { session } } = await supabase.auth.getSession();
+  const providerToken = session?.provider_token ?? null;
+
+  // When signed in via GitHub OAuth, user_metadata.user_name is the GitHub login.
+  // Falls back to the GITHUB_USERNAME env var (e.g. for email/password users).
+  const username =
+    (user?.user_metadata?.user_name as string | undefined) ??
+    process.env.GITHUB_USERNAME ??
+    "vercel";
+
+  // Display name: prefer GitHub full name, then email prefix, then username
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ??
+    user?.email?.split("@")[0] ??
+    username;
 
   let repos: GitHubRepo[] = [];
   let error: string | null = null;
 
   try {
-    repos = await fetchGitHubRepos(username);
+    repos = await fetchGitHubRepos(username, providerToken);
   } catch (e) {
     error = e instanceof Error ? e.message : "Unknown error";
   }
@@ -82,11 +101,17 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 pt-1">
-          {user && (
-            <span className="hidden text-sm text-muted-foreground sm:block">
-              {user.email}
-            </span>
+          {user?.user_metadata?.avatar_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.user_metadata.avatar_url as string}
+              alt={displayName}
+              className="hidden h-8 w-8 rounded-full sm:block"
+            />
           )}
+          <span className="hidden text-sm text-muted-foreground sm:block">
+            {displayName}
+          </span>
           <LogoutButton />
         </div>
       </div>

@@ -1,12 +1,13 @@
 import { signIn, signUp } from "@/app/actions/auth";
+import { GitHubSignInButton } from "@/components/GitHubSignInButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ShieldCheck, AlertCircle, MailCheck } from "lucide-react";
+import Link from "next/link";
 
-// Server Component — reads URL search params for flash messages (like Flask's flash())
 export default async function LoginPage({
   searchParams,
 }: {
@@ -24,9 +25,7 @@ export default async function LoginPage({
             <ShieldCheck className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Forensic Audit</h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to your dashboard
-          </p>
+          <p className="text-sm text-muted-foreground">Sign in to your dashboard</p>
         </div>
 
         {/* Flash messages */}
@@ -43,81 +42,56 @@ export default async function LoginPage({
           </div>
         )}
 
+        {/* GitHub OAuth — primary CTA */}
+        <GitHubSignInButton className="w-full" />
+
+        <div className="flex items-center gap-3">
+          <Separator className="flex-1" />
+          <span className="text-xs text-muted-foreground">or continue with email</span>
+          <Separator className="flex-1" />
+        </div>
+
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-base">Welcome back</CardTitle>
-            <CardDescription>Enter your credentials to continue</CardDescription>
+            <CardTitle className="text-base">Email &amp; Password</CardTitle>
+            <CardDescription>Sign in or create a new account</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-
-            {/* Sign In form — action= is like Flask's form POST handler */}
+            {/* Sign In */}
             <form action={signIn} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="signin-email">Email</Label>
-                <Input
-                  id="signin-email"
-                  name="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  required
-                  autoComplete="email"
-                />
+                <Input id="signin-email" name="email" type="email" placeholder="you@example.com" required autoComplete="email" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="signin-password">Password</Label>
-                <Input
-                  id="signin-password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                  minLength={6}
-                />
+                <Input id="signin-password" name="password" type="password" placeholder="••••••••" required autoComplete="current-password" minLength={6} />
               </div>
-              <Button type="submit" className="w-full">
-                Sign In
-              </Button>
+              <Button type="submit" className="w-full">Sign In</Button>
             </form>
 
-            <div className="flex items-center gap-3">
-              <Separator className="flex-1" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <Separator className="flex-1" />
-            </div>
+            <Separator />
 
-            {/* Sign Up form */}
+            {/* Sign Up */}
             <form action={signUp} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="signup-email">Email</Label>
-                <Input
-                  id="signup-email"
-                  name="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  required
-                  autoComplete="email"
-                />
+                <Input id="signup-email" name="email" type="email" placeholder="you@example.com" required autoComplete="email" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="signup-password">Password</Label>
-                <Input
-                  id="signup-password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  autoComplete="new-password"
-                  minLength={6}
-                />
+                <Input id="signup-password" name="password" type="password" placeholder="••••••••" required autoComplete="new-password" minLength={6} />
               </div>
-              <Button type="submit" variant="outline" className="w-full">
-                Create Account
-              </Button>
+              <Button type="submit" variant="outline" className="w-full">Create Account</Button>
             </form>
-
           </CardContent>
         </Card>
+
+        <p className="text-center text-xs text-muted-foreground">
+          <Link href="/" className="hover:text-foreground transition-colors underline underline-offset-4">
+            ← Back to home
+          </Link>
+        </p>
       </div>
     </main>
   );
