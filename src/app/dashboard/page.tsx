@@ -163,7 +163,7 @@ export default async function DashboardPage() {
 
       {/* Audit History */}
       <div className="mb-6">
-        <AuditHistory />
+        <AuditHistory username={username} />
       </div>
 
       {/* Repo table */}

@@ -1,23 +1,16 @@
-// Server Component — fetches directly from Supabase on the server.
-// Re-renders automatically when the parent page does a router.refresh().
+// Server Component — fetches from Supabase and passes serialisable data
+// down to the DownloadReportButton Client Component.
 import { createClient } from "@/lib/supabase/server";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { History, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
+import { DownloadReportButton } from "@/components/DownloadReportButton";
+import type { AuditReportData } from "@/lib/engine/reports";
 
 function ScoreBadge({ score }: { score: number }) {
   if (score >= 80)
@@ -41,23 +34,20 @@ function ScoreBadge({ score }: { score: number }) {
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
   }).format(new Date(iso));
 }
 
-export async function AuditHistory() {
+export async function AuditHistory({ username }: { username?: string }) {
   const supabase = await createClient();
 
   const { data: runs, error } = await supabase
     .from("audit_runs")
-    .select("id, score, secrets_count, vulnerabilities_count, scanned_files, created_at")
+    .select("id, score, secrets_count, vulnerabilities_count, scanned_files, findings, created_at")
     .order("created_at", { ascending: false })
     .limit(5);
 
-  // Table not yet created — silently hide the section
   if (error) return null;
 
   return (
@@ -78,51 +68,65 @@ export async function AuditHistory() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[160px]">Date</TableHead>
-                <TableHead className="w-[110px]">Score</TableHead>
-                <TableHead className="w-[100px] text-right">Secrets</TableHead>
-                <TableHead className="w-[120px] text-right">Vulns</TableHead>
-                <TableHead className="w-[120px] text-right">Files Scanned</TableHead>
+                <TableHead className="w-[150px]">Date</TableHead>
+                <TableHead className="w-[100px]">Score</TableHead>
+                <TableHead className="w-[90px] text-right">Secrets</TableHead>
+                <TableHead className="w-[90px] text-right">Vulns</TableHead>
+                <TableHead className="w-[110px] text-right">Files</TableHead>
+                <TableHead className="w-[90px] text-right">Report</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {runs.map((run) => (
-                <TableRow key={run.id}>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(run.created_at)}
-                  </TableCell>
-                  <TableCell>
-                    <ScoreBadge score={run.score} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant="outline"
-                      className={`border-0 text-xs ${
+              {runs.map((run) => {
+                // Build the serialisable prop passed to the Client Component.
+                // Server → Client boundary: only plain JSON, no functions/classes.
+                const findings = (run.findings ?? { secrets: [], vulnerabilities: [] }) as AuditReportData["findings"];
+                const reportData: AuditReportData = {
+                  id: run.id,
+                  score: run.score,
+                  scannedFiles: run.scanned_files,
+                  secretsCount: run.secrets_count,
+                  vulnerabilitiesCount: run.vulnerabilities_count,
+                  findings,
+                  createdAt: run.created_at,
+                  username,
+                };
+
+                return (
+                  <TableRow key={run.id}>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(run.created_at)}
+                    </TableCell>
+                    <TableCell>
+                      <ScoreBadge score={run.score} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="outline" className={`border-0 text-xs ${
                         run.secrets_count > 0
                           ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                           : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {run.secrets_count}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant="outline"
-                      className={`border-0 text-xs ${
+                      }`}>
+                        {run.secrets_count}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="outline" className={`border-0 text-xs ${
                         run.vulnerabilities_count > 0
                           ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
                           : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {run.vulnerabilities_count}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-                    {run.scanned_files}
-                  </TableCell>
-                </TableRow>
-              ))}
+                      }`}>
+                        {run.vulnerabilities_count}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                      {run.scanned_files}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DownloadReportButton data={reportData} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
