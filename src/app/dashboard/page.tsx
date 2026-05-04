@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/card";
 import { Star, GitFork, Calendar, ExternalLink } from "lucide-react";
 import { AuditPanel } from "@/components/AuditPanel";
+import { LogoutButton } from "@/components/LogoutButton";
+import { createClient } from "@/lib/supabase/server";
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -45,6 +47,8 @@ function langColor(lang: string | null): string {
 
 // async function = an async def — awaited automatically by Next.js
 export default async function DashboardPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const username = process.env.GITHUB_USERNAME ?? "vercel";
 
   let repos: GitHubRepo[] = [];
@@ -59,21 +63,31 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-background p-6 md:p-10">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Founder&apos;s Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Public repositories for{" "}
-          <a
-            href={`https://github.com/${username}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
-          >
-            @{username}
-          </a>
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Founder&apos;s Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Public repositories for{" "}
+            <a
+              href={`https://github.com/${username}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+            >
+              @{username}
+            </a>
+          </p>
+        </div>
+        <div className="flex items-center gap-3 pt-1">
+          {user && (
+            <span className="hidden text-sm text-muted-foreground sm:block">
+              {user.email}
+            </span>
+          )}
+          <LogoutButton />
+        </div>
       </div>
 
       {/* Error state */}
