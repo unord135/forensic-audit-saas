@@ -1,10 +1,8 @@
 "use client";
 
-// Client Component — has state and event handlers, like a React-heavy Jinja template.
-// The 'use client' boundary means this JS ships to the browser.
-
 import { useState, useTransition } from "react";
-import { runAudit } from "@/app/actions/audit";
+import { useRouter } from "next/navigation";
+import { runAudit, saveAuditRun } from "@/app/actions/audit";
 import type { AuditResult } from "@/lib/engine/security";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -34,26 +32,22 @@ import {
   Package,
 } from "lucide-react";
 
-// Score → visual config — like a Python dict mapping ranges to styles
 function scoreConfig(score: number) {
   if (score >= 80)
     return {
       label: "Secure",
       color: "text-emerald-600 dark:text-emerald-400",
-      bar: "bg-emerald-500",
       Icon: ShieldCheck,
     };
   if (score >= 50)
     return {
       label: "Needs Attention",
       color: "text-yellow-600 dark:text-yellow-400",
-      bar: "bg-yellow-500",
       Icon: ShieldAlert,
     };
   return {
     label: "At Risk",
     color: "text-red-600 dark:text-red-400",
-    bar: "bg-red-500",
     Icon: ShieldX,
   };
 }
@@ -66,15 +60,17 @@ const SEVERITY_STYLES: Record<string, string> = {
 };
 
 export function AuditPanel() {
-  // useState is like a mutable instance variable — like self.result = None in Python
+  const router = useRouter();
   const [result, setResult] = useState<AuditResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleRunAudit() {
-    // startTransition keeps the UI responsive while the Server Action runs
     startTransition(async () => {
       const data = await runAudit();
       setResult(data);
+      // Persist to DB then refresh Server Components so AuditHistory updates
+      await saveAuditRun(data);
+      router.refresh();
     });
   }
 
@@ -94,11 +90,7 @@ export function AuditPanel() {
           </CardDescription>
         </div>
 
-        <Button
-          onClick={handleRunAudit}
-          disabled={isPending}
-          className="shrink-0"
-        >
+        <Button onClick={handleRunAudit} disabled={isPending} className="shrink-0">
           {isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -115,34 +107,19 @@ export function AuditPanel() {
 
       {result && cfg && (
         <CardContent className="space-y-8">
-          {/* Security Score */}
+          {/* Score */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <cfg.Icon className={`h-5 w-5 ${cfg.color}`} />
-                <span className={`font-semibold ${cfg.color}`}>
-                  {cfg.label}
-                </span>
+                <span className={`font-semibold ${cfg.color}`}>{cfg.label}</span>
               </div>
               <span className="text-2xl font-bold tabular-nums">
                 {result.score}
-                <span className="text-sm font-normal text-muted-foreground">
-                  /100
-                </span>
+                <span className="text-sm font-normal text-muted-foreground">/100</span>
               </span>
             </div>
-
-            {/* Progress — the coloured bar is applied via an indicator override */}
-            <div className="relative">
-              <Progress value={result.score} className="h-3" />
-              {/* Overlay the indicator colour dynamically */}
-              <style>{`
-                [data-slot="progress-indicator"] {
-                  background-color: var(--audit-bar-color, currentColor);
-                }
-              `}</style>
-            </div>
-
+            <Progress value={result.score} className="h-3" />
             <p className="text-xs text-muted-foreground">
               Scanned {result.scannedFiles} files &middot;{" "}
               {new Date(result.timestamp).toLocaleTimeString()}
@@ -165,11 +142,8 @@ export function AuditPanel() {
                 {result.secrets.length}
               </Badge>
             </h3>
-
             {result.secrets.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No secrets detected.
-              </p>
+              <p className="text-sm text-muted-foreground">No secrets detected.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -183,18 +157,10 @@ export function AuditPanel() {
                 <TableBody>
                   {result.secrets.map((s, i) => (
                     <TableRow key={i}>
-                      <TableCell className="font-medium text-sm">
-                        {s.type}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {s.file}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-sm">
-                        {s.line}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {s.preview}
-                      </TableCell>
+                      <TableCell className="font-medium text-sm">{s.type}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{s.file}</TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">{s.line}</TableCell>
+                      <TableCell className="font-mono text-xs">{s.preview}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -218,11 +184,8 @@ export function AuditPanel() {
                 {result.vulnerabilities.length}
               </Badge>
             </h3>
-
             {result.vulnerabilities.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No known vulnerabilities found.
-              </p>
+              <p className="text-sm text-muted-foreground">No known vulnerabilities found.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -236,9 +199,7 @@ export function AuditPanel() {
                 <TableBody>
                   {result.vulnerabilities.map((v, i) => (
                     <TableRow key={i}>
-                      <TableCell className="font-mono text-sm font-medium">
-                        {v.name}
-                      </TableCell>
+                      <TableCell className="font-mono text-sm font-medium">{v.name}</TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -251,11 +212,9 @@ export function AuditPanel() {
                         {v.description}
                       </TableCell>
                       <TableCell className="text-right text-sm">
-                        {v.fixAvailable ? (
-                          <span className="text-emerald-600">Yes</span>
-                        ) : (
-                          <span className="text-muted-foreground">No</span>
-                        )}
+                        {v.fixAvailable
+                          ? <span className="text-emerald-600">Yes</span>
+                          : <span className="text-muted-foreground">No</span>}
                       </TableCell>
                     </TableRow>
                   ))}

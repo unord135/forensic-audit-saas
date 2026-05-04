@@ -17,12 +17,19 @@ export interface VulnerableDep {
   fixAvailable: boolean;
 }
 
+// AuditFindings is stored as JSONB in audit_runs.findings
+export interface AuditFindings {
+  secrets: SecretMatch[];
+  vulnerabilities: VulnerableDep[];
+}
+
 export interface AuditResult {
   secrets: SecretMatch[];
   vulnerabilities: VulnerableDep[];
   score: number;
   scannedFiles: number;
   timestamp: string;
+  findings: AuditFindings; // full JSON blob — persisted to the database as-is
 }
 
 // --- Secret scanning patterns ---

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Star, GitFork, Calendar, ExternalLink } from "lucide-react";
 import { AuditPanel } from "@/components/AuditPanel";
+import { AuditHistory } from "@/components/AuditHistory";
 import { LogoutButton } from "@/components/LogoutButton";
 import { createClient } from "@/lib/supabase/server";
 
@@ -133,6 +134,11 @@ export default async function DashboardPage() {
       {/* Security Audit */}
       <div className="mb-6">
         <AuditPanel />
+      </div>
+
+      {/* Audit History */}
+      <div className="mb-6">
+        <AuditHistory />
       </div>
 
       {/* Repo table */}

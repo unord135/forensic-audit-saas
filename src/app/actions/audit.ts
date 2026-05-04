@@ -1,8 +1,5 @@
 "use server";
 
-// Server Action — runs only on the server, like a Flask POST route handler.
-// The client calls this via form action or direct import; no API route needed.
-
 import fs from "fs/promises";
 import path from "path";
 import { exec } from "child_process";
@@ -15,6 +12,7 @@ import {
   type SecretMatch,
   type VulnerableDep,
 } from "@/lib/engine/security";
+import { createClient } from "@/lib/supabase/server";
 
 const execAsync = promisify(exec);
 
@@ -28,13 +26,11 @@ const SKIP_DIRS = new Set([
   "node_modules", ".next", ".git", "dist", "build", ".turbo",
 ]);
 
-// Recursively collect files to scan — like os.walk() in Python
 async function collectFiles(dir: string): Promise<string[]> {
   const results: string[] = [];
-
   let entries: import("fs").Dirent[];
+
   try {
-    // encoding: "utf-8" ensures entry.name is string, not Buffer
     entries = await fs.readdir(dir, { withFileTypes: true, encoding: "utf-8" });
   } catch {
     return results;
@@ -57,7 +53,6 @@ async function collectFiles(dir: string): Promise<string[]> {
 export async function runAudit(): Promise<AuditResult> {
   const projectRoot = process.cwd();
 
-  // 1. Collect + scan files for secrets
   const files = await collectFiles(projectRoot);
   const allSecrets: SecretMatch[] = [];
 
@@ -67,11 +62,10 @@ export async function runAudit(): Promise<AuditResult> {
       const rel = path.relative(projectRoot, file).replace(/\\/g, "/");
       allSecrets.push(...scanForSecrets(content, rel));
     } catch {
-      // skip unreadable files (binaries, permission errors)
+      // skip unreadable files
     }
   }
 
-  // 2. Run npm audit and parse vulnerability data
   let vulns: VulnerableDep[] = [];
   try {
     const { stdout } = await execAsync("npm audit --json", {
@@ -80,13 +74,12 @@ export async function runAudit(): Promise<AuditResult> {
     });
     vulns = auditDependencies(JSON.parse(stdout));
   } catch (err: unknown) {
-    // npm audit exits with code 1 when vulns are found; stdout still has valid JSON
     const npmErr = err as { stdout?: string };
     if (npmErr?.stdout) {
       try {
         vulns = auditDependencies(JSON.parse(npmErr.stdout));
       } catch {
-        // malformed JSON — proceed with empty vulns
+        // malformed JSON
       }
     }
   }
@@ -97,5 +90,23 @@ export async function runAudit(): Promise<AuditResult> {
     score: computeScore(allSecrets, vulns),
     scannedFiles: files.length,
     timestamp: new Date().toISOString(),
+    findings: { secrets: allSecrets, vulnerabilities: vulns },
   };
+}
+
+// Persists a completed audit result to the audit_runs table.
+// Silently skips if the user is not authenticated (e.g. during dev without login).
+export async function saveAuditRun(result: AuditResult): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from("audit_runs").insert({
+    user_id: user.id,
+    score: result.score,
+    scanned_files: result.scannedFiles,
+    secrets_count: result.secrets.length,
+    vulnerabilities_count: result.vulnerabilities.length,
+    findings: result.findings,
+  });
 }
