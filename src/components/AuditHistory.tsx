@@ -1,5 +1,3 @@
-// Server Component — fetches from Supabase and passes serialisable data
-// down to the DownloadReportButton Client Component.
 import { createClient } from "@/lib/supabase/server";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -10,6 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { History, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
 import { DownloadReportButton } from "@/components/DownloadReportButton";
+import { ShareReportButton } from "@/components/ShareReportButton";
 import type { AuditReportData } from "@/lib/engine/reports";
 
 function ScoreBadge({ score }: { score: number }) {
@@ -39,14 +38,20 @@ function formatDate(iso: string) {
   }).format(new Date(iso));
 }
 
-export async function AuditHistory({ username }: { username?: string }) {
+export async function AuditHistory({
+  username,
+  isPro,
+}: {
+  username?: string;
+  isPro: boolean;
+}) {
   const supabase = await createClient();
 
   const { data: runs, error } = await supabase
     .from("audit_runs")
-    .select("id, score, secrets_count, vulnerabilities_count, scanned_files, findings, created_at")
+    .select("id, repo_name, score, secrets_count, vulnerabilities_count, scanned_files, findings, is_public, created_at")
     .order("created_at", { ascending: false })
-    .limit(5);
+    .limit(10);
 
   if (error) return null;
 
@@ -62,24 +67,23 @@ export async function AuditHistory({ username }: { username?: string }) {
       <CardContent className="p-0">
         {!runs || runs.length === 0 ? (
           <p className="px-6 py-8 text-center text-sm text-muted-foreground">
-            No audit runs yet — click <strong>Run Audit</strong> to create your first scan.
+            No audit runs yet — pick a repo above and click <strong>Run Audit</strong>.
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[150px]">Date</TableHead>
-                <TableHead className="w-[100px]">Score</TableHead>
-                <TableHead className="w-[90px] text-right">Secrets</TableHead>
-                <TableHead className="w-[90px] text-right">Vulns</TableHead>
-                <TableHead className="w-[110px] text-right">Files</TableHead>
-                <TableHead className="w-[90px] text-right">Report</TableHead>
+                <TableHead>Repo</TableHead>
+                <TableHead className="w-[80px]">Score</TableHead>
+                <TableHead className="w-[80px] text-right">Secrets</TableHead>
+                <TableHead className="w-[80px] text-right">Vulns</TableHead>
+                <TableHead className="w-[100px] text-right">Date</TableHead>
+                <TableHead className="w-[80px] text-right">PDF</TableHead>
+                <TableHead className="w-[90px] text-right">Share</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {runs.map((run) => {
-                // Build the serialisable prop passed to the Client Component.
-                // Server → Client boundary: only plain JSON, no functions/classes.
                 const findings = (run.findings ?? { secrets: [], vulnerabilities: [] }) as AuditReportData["findings"];
                 const reportData: AuditReportData = {
                   id: run.id,
@@ -94,8 +98,8 @@ export async function AuditHistory({ username }: { username?: string }) {
 
                 return (
                   <TableRow key={run.id}>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(run.created_at)}
+                    <TableCell className="text-sm font-mono text-muted-foreground max-w-[160px] truncate">
+                      {run.repo_name ?? "—"}
                     </TableCell>
                     <TableCell>
                       <ScoreBadge score={run.score} />
@@ -118,11 +122,14 @@ export async function AuditHistory({ username }: { username?: string }) {
                         {run.vulnerabilities_count}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-                      {run.scanned_files}
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      {formatDate(run.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DownloadReportButton data={reportData} />
+                      <DownloadReportButton data={reportData} isPro={isPro} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <ShareReportButton runId={run.id} />
                     </TableCell>
                   </TableRow>
                 );

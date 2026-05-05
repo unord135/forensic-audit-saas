@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -25,25 +25,21 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: always call getUser() to refresh the session — do not remove
+  // Refresh the session on every request — do not remove this call.
   const { data: { user } } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-  const isProtected = path.startsWith("/dashboard");
-  const isAuthOrLanding = path === "/" || path.startsWith("/login") || path.startsWith("/auth");
+  const pathname = request.nextUrl.pathname;
 
-  // Unauthenticated user hitting a protected route → landing page
-  if (!user && isProtected) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+  // Unauthenticated user hitting /dashboard → send to login with ?next= for redirect after sign-in.
+  if (!user && pathname.startsWith("/dashboard")) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // Authenticated user hitting the landing page or login → dashboard
-  if (user && (path === "/" || path === "/login")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  // Authenticated user hitting /login → send straight to dashboard.
+  if (user && pathname === "/login") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return supabaseResponse;

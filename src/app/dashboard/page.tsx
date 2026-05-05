@@ -22,6 +22,9 @@ import { AuditPanel } from "@/components/AuditPanel";
 import { AuditHistory } from "@/components/AuditHistory";
 import { LogoutButton } from "@/components/LogoutButton";
 import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
+import { PaymentBanner } from "@/components/PaymentBanner";
+import { Suspense } from "react";
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -52,6 +55,13 @@ export default async function DashboardPage() {
 
   // getUser() verifies the JWT server-side (secure auth check)
   const { data: { user } } = await supabase.auth.getUser();
+
+  // Fetch the user's subscription status from the profiles table.
+  // is_pro is set to true by the Stripe webhook after a successful payment.
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("is_pro, subscription_plan").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const isPro = profile?.is_pro ?? false;
 
   // getSession() gives us the provider_token (GitHub OAuth token) for API calls.
   // provider_token is separate from the Supabase JWT — it's the raw GitHub access token.
@@ -112,9 +122,25 @@ export default async function DashboardPage() {
           <span className="hidden text-sm text-muted-foreground sm:block">
             {displayName}
           </span>
+          {isPro ? (
+            <Badge className="bg-amber-100 text-amber-800 border-0 dark:bg-amber-900 dark:text-amber-200">
+              Pro
+            </Badge>
+          ) : (
+            <a href="/api/checkout?plan=starter">
+              <Button size="sm" variant="outline">
+                Upgrade — ₹1,499/mo
+              </Button>
+            </a>
+          )}
           <LogoutButton />
         </div>
       </div>
+
+      {/* Payment success / cancelled banner */}
+      <Suspense fallback={null}>
+        <PaymentBanner />
+      </Suspense>
 
       {/* Error state */}
       {error && (
@@ -158,13 +184,32 @@ export default async function DashboardPage() {
 
       {/* Security Audit */}
       <div className="mb-6">
-        <AuditPanel />
+        <AuditPanel repos={repos} />
       </div>
 
       {/* Audit History */}
       <div className="mb-6">
-        <AuditHistory username={username} />
+        <AuditHistory username={username} isPro={isPro} />
       </div>
+
+      {/* PDF upsell — only shown to free users */}
+      {!isPro && (
+        <div className="mb-6">
+          <Card className="border-dashed bg-muted/20">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-base">Get your PDF Security Certification</CardTitle>
+                <CardDescription className="mt-1">
+                  Download a professional PDF from any scan in your history. Share the link directly with investors.
+                </CardDescription>
+              </div>
+              <a href="/api/checkout" className="shrink-0">
+                <Button>Get PDF Access — ₹999</Button>
+              </a>
+            </CardHeader>
+          </Card>
+        </div>
+      )}
 
       {/* Repo table */}
       <Card>

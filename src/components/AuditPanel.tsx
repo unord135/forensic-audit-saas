@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { runAudit, saveAuditRun } from "@/app/actions/audit";
+import { runRepoAudit, saveAuditRun } from "@/app/actions/audit";
 import type { AuditResult } from "@/lib/engine/security";
+import type { GitHubRepo } from "@/lib/engine/github";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -30,47 +31,43 @@ import {
   Loader2,
   KeyRound,
   Package,
+  ChevronDown,
 } from "lucide-react";
 
 function scoreConfig(score: number) {
   if (score >= 80)
-    return {
-      label: "Secure",
-      color: "text-emerald-600 dark:text-emerald-400",
-      Icon: ShieldCheck,
-    };
+    return { label: "Secure", color: "text-emerald-600 dark:text-emerald-400", Icon: ShieldCheck };
   if (score >= 50)
-    return {
-      label: "Needs Attention",
-      color: "text-yellow-600 dark:text-yellow-400",
-      Icon: ShieldAlert,
-    };
-  return {
-    label: "At Risk",
-    color: "text-red-600 dark:text-red-400",
-    Icon: ShieldX,
-  };
+    return { label: "Needs Attention", color: "text-yellow-600 dark:text-yellow-400", Icon: ShieldAlert };
+  return { label: "At Risk", color: "text-red-600 dark:text-red-400", Icon: ShieldX };
 }
 
 const SEVERITY_STYLES: Record<string, string> = {
   critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  high: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  high:     "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
   moderate: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  low: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  low:      "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
-export function AuditPanel() {
+export function AuditPanel({ repos }: { repos: GitHubRepo[] }) {
   const router = useRouter();
   const [result, setResult] = useState<AuditResult | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<string>(repos[0]?.full_name ?? "");
 
   function handleRunAudit() {
+    if (!selectedRepo) return;
+    setError(null);
     startTransition(async () => {
-      const data = await runAudit();
-      setResult(data);
-      // Persist to DB then refresh Server Components so AuditHistory updates
-      await saveAuditRun(data);
-      router.refresh();
+      try {
+        const data = await runRepoAudit(selectedRepo);
+        setResult(data);
+        await saveAuditRun(data, selectedRepo);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Audit failed. Please try again.");
+      }
     });
   }
 
@@ -85,25 +82,60 @@ export function AuditPanel() {
             Security Audit
           </CardTitle>
           <CardDescription className="mt-1">
-            Scan source files for leaked secrets and check npm dependencies for
-            known vulnerabilities.
+            Select a repository and scan it for leaked secrets and vulnerable
+            dependencies.
           </CardDescription>
         </div>
 
-        <Button onClick={handleRunAudit} disabled={isPending} className="shrink-0">
-          {isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Scanning…
-            </>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Repo selector — like a Python select widget */}
+          {repos.length > 0 ? (
+            <div className="relative">
+              <select
+                value={selectedRepo}
+                onChange={(e) => setSelectedRepo(e.target.value)}
+                disabled={isPending}
+                className="h-9 appearance-none rounded-md border bg-background px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 cursor-pointer"
+              >
+                {repos.map((r) => (
+                  <option key={r.id} value={r.full_name}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
           ) : (
-            <>
-              <ScanLine className="mr-2 h-4 w-4" />
-              Run Audit
-            </>
+            <span className="text-sm text-muted-foreground">No repos found</span>
           )}
-        </Button>
+
+          <Button
+            onClick={handleRunAudit}
+            disabled={isPending || !selectedRepo}
+            className="shrink-0"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Scanning…
+              </>
+            ) : (
+              <>
+                <ScanLine className="mr-2 h-4 w-4" />
+                Run Audit
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
+
+      {error && (
+        <CardContent>
+          <p className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </p>
+        </CardContent>
+      )}
 
       {result && cfg && (
         <CardContent className="space-y-8">
@@ -113,6 +145,9 @@ export function AuditPanel() {
               <div className="flex items-center gap-2">
                 <cfg.Icon className={`h-5 w-5 ${cfg.color}`} />
                 <span className={`font-semibold ${cfg.color}`}>{cfg.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  — {selectedRepo}
+                </span>
               </div>
               <span className="text-2xl font-bold tabular-nums">
                 {result.score}
